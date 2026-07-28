@@ -293,6 +293,15 @@
       </div>
 
       <div class="field">
+        <label>Wat is je doel?</label>
+        <div class="seg" id="seg-mode">
+          <button data-mode="event" aria-pressed="true">Vierdaagse-doel</button>
+          <button data-mode="vrij" aria-pressed="false">Vrij trainen</button>
+        </div>
+        <p class="hint">Vierdaagse-doel telt af naar de wandeldagen, met piek en taper. Vrij trainen is een doorlopend schema zonder einddatum — ideaal om gewoon je conditie op te bouwen.</p>
+      </div>
+
+      <div class="field mode-event">
         <label>Doelafstand per dag</label>
         <div class="seg" id="seg-goal">
           <button data-goal="30" aria-pressed="false">30 km</button>
@@ -300,6 +309,18 @@
           <button data-goal="50" aria-pressed="false">50 km</button>
         </div>
         <p class="hint">Voor mannen van 19 t/m 49 is 50 km de reglementaire afstand. 40 km is voor veel deelnemers de gangbare keuze.</p>
+      </div>
+
+      <div class="field mode-vrij" style="display:none">
+        <label>Doel-afstand — hoe ver wil je comfortabel kunnen wandelen?</label>
+        <div class="seg" id="seg-target">
+          <button data-target="10" aria-pressed="false">10 km</button>
+          <button data-target="15" aria-pressed="true">15 km</button>
+          <button data-target="20" aria-pressed="false">20 km</button>
+          <button data-target="25" aria-pressed="false">25 km</button>
+          <button data-target="30" aria-pressed="false">30 km</button>
+        </div>
+        <p class="hint">Het schema bouwt hier rustig naartoe en houdt je conditie daarna op peil met onderhoudsweken.</p>
       </div>
 
       <div class="field">
@@ -317,12 +338,12 @@
           <label for="start-date">Startdatum training</label>
           <input type="date" id="start-date">
         </div>
-        <div class="field">
+        <div class="field mode-event">
           <label for="event-date">Eerste wandeldag Vierdaagse</label>
           <input type="date" id="event-date">
         </div>
       </div>
-      <p class="hint" style="margin-bottom:16px">De Vierdaagse 2027 valt naar verwachting rond dinsdag 20 t/m vrijdag 23 juli. Pas de datum aan als de organisatie iets anders bekendmaakt.</p>
+      <p class="hint mode-event" style="margin-bottom:16px">De Vierdaagse 2027 valt naar verwachting rond dinsdag 20 t/m vrijdag 23 juli. Pas de datum aan als de organisatie iets anders bekendmaakt.</p>
 
       <div class="field" style="margin-bottom:6px">
         <label for="ors-key">OpenRouteService API-sleutel (voor het genereren van routes)</label>
@@ -369,7 +390,7 @@ const store = (function(){
 
 /* ---------- Standaardinstellingen ---------- */
 function todayISO(){ const d=new Date(); return d.toISOString().slice(0,10); }
-const DEFAULTS = { name:'', goal:40, level:'beginner', start:todayISO(), event:'2027-07-20', key:'' };
+const DEFAULTS = { name:'', mode:'event', goal:40, targetKm:15, level:'beginner', start:todayISO(), event:'2027-07-20', key:'' };
 
 let settings = loadSettings();
 function loadSettings(){
@@ -392,11 +413,15 @@ const PHASES = {
   basis:   {label:'Basis',   color:'#2E7D53'},
   opbouw:  {label:'Opbouw',  color:'#1C5238'},
   piek:    {label:'Piek',    color:'#CE2C63'},
-  taper:   {label:'Taperen', color:'#E1A02C'}
+  taper:   {label:'Taperen', color:'#E1A02C'},
+  onderhoud:{label:'Onderhoud', color:'#5AA469'}
 };
 const DAY_NAMES = ['Ma','Di','Wo','Do','Vr','Za','Zo'];
 
 function generateSchema(){
+  return settings.mode==='vrij' ? generateFreeSchema() : generateEventSchema();
+}
+function generateEventSchema(){
   const start = mondayOf(new Date(settings.start));
   const event = new Date(settings.event);
   const totalWeeks = Math.floor((event - start)/(7*864e5));
@@ -465,6 +490,61 @@ function generateSchema(){
   return {weeks, totalWeeks};
 }
 
+function generateFreeSchema(){
+  const start = mondayOf(new Date(settings.start));
+  const startLong = settings.level==='gevorderd'?15 : settings.level==='gemiddeld'?10 : 6;
+  const target = Math.max(startLong+2, settings.targetKm);
+  const rampWeeks = Math.max(4, Math.ceil((target - startLong)/1.5)); // ~1,5 km per week erbij
+  const maintainWeeks = 8;
+  const b2bStart = Math.max(2, Math.round(rampWeeks*0.5)); // tweede weekenddag vanaf halverwege
+  const totalWeeks = rampWeeks + maintainWeeks;
+
+  const weeks = [];
+  for(let i=0;i<totalWeeks;i++){
+    const wkStart = addDays(start, i*7);
+    let phase, longKm, secondLong=0, midCount, note;
+    if(i < rampWeeks){
+      phase='opbouw';
+      const p = rampWeeks>1 ? i/(rampWeeks-1) : 1;
+      let base = startLong + (target - startLong)*p;
+      if((i+1)%4===0) base *= 0.8; // herstelweek
+      longKm = Math.round(base);
+      midCount = (settings.level==='beginner' && i<2) ? 2 : 3;
+      note = 'Rustig opbouwen naar je doel. Verhoog geleidelijk en luister naar je lichaam.';
+      if(i>=b2bStart) secondLong = Math.round(longKm*0.6);
+    } else {
+      phase='onderhoud';
+      const wave = [1, 0.8, 1.1, 0.9][(i-rampWeeks)%4]; // lichte variatie
+      longKm = Math.round(target*wave);
+      midCount = 3;
+      note = 'Onderhoudsweek: conditie vasthouden. Wissel af in afstand en route zodat het leuk blijft.';
+      secondLong = Math.round(longKm*0.55);
+    }
+    const midKm = Math.max(3, Math.round(longKm*0.45));
+    const days = [
+      {d:'Ma', km: midCount>=1?midKm:0, type: midCount>=1?'mid':'rest'},
+      {d:'Di', km:0, type:'rest'},
+      {d:'Wo', km: midCount>=2?midKm:0, type: midCount>=2?'mid':'rest'},
+      {d:'Do', km:0, type:'rest'},
+      {d:'Vr', km: midCount>=3?Math.round(midKm*0.9):0, type: midCount>=3?'mid':'rest'},
+      {d:'Za', km:longKm, type:'long'},
+      {d:'Zo', km:secondLong, type: secondLong>0?'long':'rest'}
+    ];
+    const total = days.reduce((s,x)=>s+x.km,0);
+    weeks.push({index:i, wkStart, phase, days, note, total});
+  }
+  return {weeks, totalWeeks, free:true, rampWeeks};
+}
+
+function currentWeekIndex(res){
+  if(settings.mode==='vrij'){
+    for(let k=0;k<res.weeks.length;k++){ if(!doneWeeks[k]) return k; }
+    return res.weeks.length-1;
+  }
+  const now=new Date(); now.setHours(0,0,0,0);
+  return res.weeks.findIndex(w=> now>=w.wkStart && now<=addDays(w.wkStart,6));
+}
+
 /* ---------- Schema renderen ---------- */
 let schemaCache = null;
 function renderSchema(){
@@ -480,18 +560,19 @@ function renderSchema(){
     return;
   }
 
-  legend.innerHTML = Object.values(PHASES).map(p=>
-    `<span style="background:${p.color}">${p.label}</span>`).join('');
+  const used = [...new Set(res.weeks.map(w=>w.phase))];
+  legend.innerHTML = used.map(k=>`<span style="background:${PHASES[k].color}">${PHASES[k].label}</span>`).join('');
 
-  const now = new Date(); now.setHours(0,0,0,0);
   const naam = settings.name ? settings.name+', ' : '';
-  sub.textContent = `${naam}${res.totalWeeks} weken opbouw naar ${settings.goal} km per dag. Vink af wat je gelopen hebt.`;
+  sub.textContent = res.free
+    ? `${naam}doorlopend schema naar ${settings.targetKm} km. Vink weken af; je gaat op je eigen tempo verder.`
+    : `${naam}${res.totalWeeks} weken opbouw naar ${settings.goal} km per dag. Vink af wat je gelopen hebt.`;
 
+  const nowIdx = currentWeekIndex(res);
   let html = '<div class="road">';
   res.weeks.forEach(w=>{
     const wkEnd = addDays(w.wkStart,6);
-    const isNow = now >= w.wkStart && now <= wkEnd;
-    const isDone = !!doneWeeks[w.index] || (wkEnd < now && !isNow);
+    const isNow = w.index===nowIdx;
     const ph = PHASES[w.phase];
     const cls = ['week']; if(isNow)cls.push('now'); if(doneWeeks[w.index])cls.push('done');
 
@@ -501,14 +582,17 @@ function renderSchema(){
       return `<div class="${c}"><div class="d">${d.d}</div><div class="km">${d.km}</div></div>`;
     }).join('');
 
+    const dateLine = res.free ? '' : `<div class="wk-date">${fmtDate(w.wkStart)} – ${fmtDate(wkEnd)}</div>`;
+    const nowFlag = isNow ? ' <span class="wk-now-flag">· nu</span>' : '';
+
     html += `
     <div class="${cls.join(' ')}">
       <div class="node"></div>
       <div class="wk-card">
         <div class="wk-head">
           <div>
-            <div class="wk-title">Week ${w.index+1}${isNow?' <span class="wk-now-flag">· nu</span>':''}</div>
-            <div class="wk-date">${fmtDate(w.wkStart)} – ${fmtDate(wkEnd)}</div>
+            <div class="wk-title">Week ${w.index+1}${nowFlag}</div>
+            ${dateLine}
           </div>
           <span class="wk-phase" style="background:${ph.color}">${ph.label}</span>
         </div>
@@ -538,21 +622,40 @@ function renderSchema(){
 /* ---------- Countdown ---------- */
 function renderCountdown(){
   const el = document.getElementById('countdown');
-  const event = new Date(settings.event);
   const now = new Date(); now.setHours(0,0,0,0);
+  const res = schemaCache || generateSchema();
+  const curIdx = currentWeekIndex(res);
+
+  if(settings.mode==='vrij'){
+    const cur = res.weeks[curIdx] || res.weeks[0];
+    const wkKm = cur ? cur.total : 0;
+    const phaseLabel = (cur && cur.phase==='onderhoud') ? 'onderhoud' : 'opbouw';
+    el.innerHTML = `
+      <div class="cd-chip"><span class="n">${curIdx+1}</span><span class="l">huidige week</span></div>
+      <div class="cd-chip"><span class="n">${settings.targetKm}</span><span class="l">km doel-afstand</span></div>
+      <div class="cd-chip"><span class="n">${wkKm}</span><span class="l">km deze week</span></div>
+      <div class="cd-chip"><span class="n" style="font-size:15px;line-height:2">${phaseLabel}</span><span class="l">fase</span></div>
+    `;
+    return;
+  }
+
+  const event = new Date(settings.event);
   const days = Math.max(0, Math.ceil((event-now)/864e5));
   const weeks = Math.floor(days/7);
-  const res = schemaCache || generateSchema();
-  const curWeek = res.weeks.findIndex(w=> now>=w.wkStart && now<=addDays(w.wkStart,6));
   el.innerHTML = `
     <div class="cd-chip"><span class="n">${days}</span><span class="l">dagen te gaan</span></div>
     <div class="cd-chip"><span class="n">${weeks}</span><span class="l">weken</span></div>
     <div class="cd-chip"><span class="n">${settings.goal}</span><span class="l">km / dag doel</span></div>
-    ${curWeek>=0?`<div class="cd-chip"><span class="n">${curWeek+1}</span><span class="l">huidige week</span></div>`:''}
+    ${curIdx>=0?`<div class="cd-chip"><span class="n">${curIdx+1}</span><span class="l">huidige week</span></div>`:''}
   `;
 }
 
 /* ---------- Instellingen UI ---------- */
+function applyModeVisibility(){
+  const vrij = settings.mode==='vrij';
+  document.querySelectorAll('.mode-event').forEach(el=> el.style.display = vrij?'none':'');
+  document.querySelectorAll('.mode-vrij').forEach(el=> el.style.display = vrij?'':'none');
+}
 function initSettingsUI(){
   document.getElementById('name').value = settings.name;
   document.getElementById('start-date').value = settings.start;
@@ -567,6 +670,15 @@ function initSettingsUI(){
     b.setAttribute('aria-pressed', String(b.dataset.level===settings.level));
     b.onclick=()=>{ document.querySelectorAll('#seg-level button').forEach(x=>x.setAttribute('aria-pressed','false')); b.setAttribute('aria-pressed','true'); settings.level=b.dataset.level; };
   });
+  document.querySelectorAll('#seg-target button').forEach(b=>{
+    b.setAttribute('aria-pressed', String(+b.dataset.target===settings.targetKm));
+    b.onclick=()=>{ document.querySelectorAll('#seg-target button').forEach(x=>x.setAttribute('aria-pressed','false')); b.setAttribute('aria-pressed','true'); settings.targetKm=+b.dataset.target; };
+  });
+  document.querySelectorAll('#seg-mode button').forEach(b=>{
+    b.setAttribute('aria-pressed', String(b.dataset.mode===settings.mode));
+    b.onclick=()=>{ document.querySelectorAll('#seg-mode button').forEach(x=>x.setAttribute('aria-pressed','false')); b.setAttribute('aria-pressed','true'); settings.mode=b.dataset.mode; applyModeVisibility(); };
+  });
+  applyModeVisibility();
 
   document.getElementById('btn-save').onclick = ()=>{
     settings.name = document.getElementById('name').value.trim();
@@ -692,8 +804,7 @@ function setRouteNote(msg,type){
 /* Afstandsslider + hint uit huidige week */
 function updateWeekHint(){
   const res = schemaCache || generateSchema();
-  const now=new Date(); now.setHours(0,0,0,0);
-  const cur = res.weeks.find(w=> now>=w.wkStart && now<=addDays(w.wkStart,6));
+  const cur = res.weeks[currentWeekIndex(res)];
   const hint=document.getElementById('dist-week-hint');
   if(cur){
     const longKm = Math.max(...cur.days.map(d=>d.km));
