@@ -184,6 +184,31 @@
   .notice{background:#FDF6E6;border:1px solid #E6D28A;border-radius:10px;padding:11px 13px;font-size:13px;color:#6b551f;margin-top:12px}
   .notice.err{background:#FCEEF0;border-color:#E4A9B6;color:#8a2540}
 
+  /* Routebeschrijving */
+  .dir-card{margin-top:0}
+  .dir-head{display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:12px}
+  .dir-head h3{font-size:18px;font-weight:800}
+  .dir-meta{font-size:13px;color:var(--gladiool);font-weight:700}
+  .dir-list{list-style:none;margin:0;padding:0}
+  .dir-list li{display:flex;gap:11px;padding:10px 0;border-bottom:1px solid var(--line-soft);align-items:flex-start}
+  .dir-list li:last-child{border-bottom:0}
+  .step-n{flex:0 0 auto;width:24px;height:24px;border-radius:50%;background:var(--route);color:#fff;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;margin-top:1px}
+  .step-txt{font-size:14px;line-height:1.45}
+  .step-street{color:var(--ink-soft)}
+  .step-d{display:inline-block;margin-left:6px;color:var(--route-2);font-size:12px}
+  .dir-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
+
+  @media print{
+    header, nav.tabs, footer, .card:not(.dir-card), #map, .route-stats,
+    #route-again, #route-note, .panel:not(#panel-route) { display:none !important; }
+    .panel#panel-route{display:block !important;padding-top:0}
+    .panel#panel-route h2, .panel#panel-route .sub{display:none}
+    .dir-actions{display:none !important}
+    body{background:#fff}
+    .dir-card{border:0;box-shadow:none;padding:0}
+    .wrap{padding:0}
+  }
+
   /* Tips */
   .tip{display:flex;gap:12px;padding:14px 0;border-bottom:1px solid var(--line-soft)}
   .tip:last-child{border-bottom:0}
@@ -272,6 +297,7 @@
     <div class="route-controls" id="route-again" style="display:none">
       <button class="btn secondary block" id="btn-again">Ander rondje, zelfde afstand</button>
     </div>
+    <div id="route-directions" style="display:none;margin-top:14px"></div>
   </section>
 
   <!-- TIPS -->
@@ -764,6 +790,9 @@ async function generateRoute(reuseDist){
       headers:{'Authorization':key,'Content-Type':'application/json'},
       body: JSON.stringify({
         coordinates:[[startCoord[1],startCoord[0]]],
+        instructions:true,
+        instruction_format:'text',
+        language:'nl',
         options:{ round_trip:{ length:length, points:5, seed:seed } }
       })
     });
@@ -788,7 +817,8 @@ async function generateRoute(reuseDist){
     document.getElementById('stat-time').textContent = Math.floor(min/60)+'u '+(min%60)+'m';
     document.getElementById('route-stats').style.display='flex';
     document.getElementById('route-again').style.display='block';
-    setRouteNote('Klaar! Tik op "Ander rondje" voor een nieuw parcours met dezelfde afstand.','');
+    renderDirections(feat, km, min);
+    setRouteNote('Klaar! Tik op "Ander rondje" voor een nieuw parcours, of bewaar de beschrijving voor onderweg.','');
   }catch(e){
     setRouteNote('Route ophalen lukte niet. Dit werkt het best wanneer je de app zelf host op GitHub Pages (in de preview blokkeert de browser dit soms).','err');
   }finally{
@@ -799,6 +829,66 @@ async function generateRoute(reuseDist){
 function setRouteNote(msg,type){
   const el=document.getElementById('route-note');
   el.innerHTML = msg ? `<div class="notice ${type==='err'?'err':''}">${msg}</div>` : '';
+}
+
+/* ---------- Routebeschrijving ---------- */
+let lastDirectionsText = '';
+function fmtMeters(m){ return m>=1000 ? (m/1000).toFixed(1).replace('.',',')+' km' : Math.round(m)+' m'; }
+
+function renderDirections(feat, km, min){
+  const box = document.getElementById('route-directions');
+  const segs = (feat.properties && feat.properties.segments) || [];
+  const steps = segs.flatMap(s=> s.steps || []);
+  if(!steps.length){ box.innerHTML=''; box.style.display='none'; return; }
+
+  const tijd = Math.floor(min/60)+'u '+(min%60)+'m';
+  const startNaam = document.getElementById('loc-input').value.trim() || 'startpunt';
+
+  // Lijst voor op het scherm
+  let items = steps.map((st,i)=>{
+    const afstand = st.distance>0 ? `<span class="step-d mono">${fmtMeters(st.distance)}</span>` : '';
+    return `<li><span class="step-n mono">${i+1}</span><div class="step-txt">${st.instruction}${afstand}</div></li>`;
+  }).join('');
+
+  box.innerHTML = `
+    <div class="card dir-card">
+      <div class="dir-head">
+        <h3>Routebeschrijving</h3>
+        <span class="dir-meta mono">${km.toFixed(1).replace('.',',')} km · ±${tijd}</span>
+      </div>
+      <ol class="dir-list">${items}</ol>
+      <div class="dir-actions">
+        <button class="btn secondary" id="btn-share">Deel / bewaar</button>
+        <button class="btn secondary" id="btn-print">Print of pdf</button>
+      </div>
+      <p class="hint" style="margin-top:10px">Tip: deel de beschrijving naar je Notities-app, dan heb je hem onderweg altijd bij de hand — ook zonder bereik.</p>
+    </div>`;
+  box.style.display='block';
+
+  // Platte tekst voor delen/printen
+  lastDirectionsText =
+    `Wandelroute (${km.toFixed(1).replace('.',',')} km, ±${tijd})\nStart: ${startNaam}\n\n` +
+    steps.map((st,i)=>{
+      const afstand = st.distance>0 ? ` – ${fmtMeters(st.distance)}` : '';
+      return `${i+1}. ${st.instruction}${afstand}`;
+    }).join('\n');
+
+  document.getElementById('btn-share').onclick = shareDirections;
+  document.getElementById('btn-print').onclick = ()=>window.print();
+}
+
+async function shareDirections(){
+  if(!lastDirectionsText) return;
+  if(navigator.share){
+    try{ await navigator.share({title:'Wandelroute', text:lastDirectionsText}); return; }
+    catch(e){ if(e && e.name==='AbortError') return; }
+  }
+  try{
+    await navigator.clipboard.writeText(lastDirectionsText);
+    setRouteNote('Routebeschrijving gekopieerd — plak hem in je Notities of een berichtje.','');
+  }catch(e){
+    setRouteNote('Kopiëren lukte niet in deze browser. Op de gehoste versie werkt delen wel.','err');
+  }
 }
 
 /* Afstandsslider + hint uit huidige week */
