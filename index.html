@@ -425,6 +425,17 @@ const store = (function(){
 
 /* ---------- Standaardinstellingen ---------- */
 function todayISO(){ const d=new Date(); return d.toISOString().slice(0,10); }
+/* =====================================================================
+   OPTIONEEL: plak hieronder tussen de aanhalingstekens je OpenRouteService-
+   sleutel. Dan werkt het genereren van routes in ELKE browser en op elk
+   apparaat, zonder de sleutel telkens opnieuw in te vullen.
+   Let op: je GitHub Pages-site is openbaar, dus de sleutel is dan zichtbaar
+   in de broncode. Voor een gratis sleutel met daglimiet is dat een beperkt
+   risico; bij misbruik maak je gewoon een nieuwe sleutel aan.
+   Laat je hem leeg (""), dan werkt alles zoals nu (sleutel per browser opslaan).
+   ===================================================================== */
+const DEFAULT_ORS_KEY = "";
+
 const DEFAULTS = { name:'', mode:'event', goal:40, targetKm:15, level:'beginner', start:todayISO(), event:'2027-07-20', key:'' };
 
 let settings = loadSettings();
@@ -695,7 +706,7 @@ function initSettingsUI(){
   document.getElementById('name').value = settings.name;
   document.getElementById('start-date').value = settings.start;
   document.getElementById('event-date').value = settings.event;
-  document.getElementById('ors-key').value = settings.key;
+  document.getElementById('ors-key').value = settings.key || DEFAULT_ORS_KEY;
 
   document.querySelectorAll('#seg-goal button').forEach(b=>{
     b.setAttribute('aria-pressed', String(+b.dataset.goal===settings.goal));
@@ -784,7 +795,7 @@ function useGeo(){
 let lastDist=null;
 async function generateRoute(reuseDist){
   if(!startCoord){ setRouteNote('Zet eerst een startpunt: zoek een adres, gebruik je locatie of tik op de kaart.','err'); return; }
-  const key = settings.key || document.getElementById('ors-key').value.trim();
+  const key = settings.key || document.getElementById('ors-key').value.trim() || DEFAULT_ORS_KEY;
   if(!key){ setRouteNote('Voor het uittekenen van rondjes is een gratis OpenRouteService-sleutel nodig. Vul die in bij Instellingen (met uitleg hoe je hem krijgt).','err'); openTab('instellingen'); return; }
 
   const distKm = reuseDist && lastDist ? lastDist : +document.getElementById('dist-input').value;
