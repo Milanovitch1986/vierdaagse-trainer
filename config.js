@@ -14,4 +14,4 @@
    nieuwe sleutel aan en vervang je hem hieronder.
    ===================================================================== */
 
-window.ORS_KEY = "PLAK-HIER-JE-SLEUTEL";
+window.ORS_KEY = "eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6IjkyZGY0YmI3MzAwNTQwZjQ4ZmMwZWFkYzkzMzMyYjYxIiwiaCI6Im11cm11cjY0In0=";
