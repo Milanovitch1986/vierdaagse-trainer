@@ -791,15 +791,17 @@ async function generateRoute(reuseDist){
       body: JSON.stringify({
         coordinates:[[startCoord[1],startCoord[0]]],
         instructions:true,
-        instruction_format:'text',
+        instructions_format:'text',
         language:'nl',
         options:{ round_trip:{ length:length, points:5, seed:seed } }
       })
     });
     if(!r.ok){
+      let detail='';
+      try{ const eb=await r.json(); if(eb&&eb.error) detail = typeof eb.error==='string'?eb.error:(eb.error.message||''); }catch(e){}
       const t = r.status===403||r.status===401 ? 'De sleutel wordt niet geaccepteerd. Controleer je OpenRouteService-sleutel bij Instellingen.' :
                 r.status===429 ? 'Even te veel aanvragen. Wacht een halve minuut en probeer opnieuw.' :
-                'De routeservice gaf een fout ('+r.status+'). Probeer een iets kortere afstand.';
+                'De routeservice gaf een fout ('+r.status+')'+(detail?': '+detail:'.')+' Probeer eventueel een andere afstand of startpunt.';
       setRouteNote(t,'err'); return;
     }
     const geo = await r.json();
