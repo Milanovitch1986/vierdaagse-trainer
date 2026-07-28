@@ -132,6 +132,9 @@
   .savebar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:6px}
   .saved-msg{color:var(--route-2);font-weight:600;font-size:14px;opacity:0;transition:opacity .2s}
   .saved-msg.show{opacity:1}
+  .key-row{display:flex;gap:8px;align-items:stretch}
+  .key-row input{flex:1;min-width:0}
+  .key-row #btn-key-toggle{flex:0 0 auto;padding:11px 14px}
 
   /* Schema route-line (signature) */
   .phase-legend{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px}
@@ -382,7 +385,10 @@
 
       <div class="field" style="margin-bottom:6px">
         <label for="ors-key">OpenRouteService API-sleutel (voor het genereren van routes)</label>
-        <input type="text" id="ors-key" placeholder="Plak hier je gratis sleutel" autocomplete="off">
+        <div class="key-row">
+          <input type="password" id="ors-key" placeholder="Plak hier je gratis sleutel" autocomplete="off" autocapitalize="off" spellcheck="false">
+          <button type="button" class="btn secondary" id="btn-key-toggle" aria-pressed="false">Toon</button>
+        </div>
         <details class="key">
           <summary>Hoe kom ik gratis aan zo'n sleutel?</summary>
           <div class="body">
@@ -434,7 +440,7 @@ function todayISO(){ const d=new Date(); return d.toISOString().slice(0,10); }
    risico; bij misbruik maak je gewoon een nieuwe sleutel aan.
    Laat je hem leeg (""), dan werkt alles zoals nu (sleutel per browser opslaan).
    ===================================================================== */
-const DEFAULT_ORS_KEY = "eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6IjkyZGY0YmI3MzAwNTQwZjQ4ZmMwZWFkYzkzMzMyYjYxIiwiaCI6Im11cm11cjY0In0=";
+const DEFAULT_ORS_KEY = "";
 
 const DEFAULTS = { name:'', mode:'event', goal:40, targetKm:15, level:'beginner', start:todayISO(), event:'2027-07-20', key:'' };
 
@@ -966,6 +972,13 @@ document.getElementById('btn-again').onclick = ()=>generateRoute(true);
 document.querySelectorAll('#seg-terrain button').forEach(b=>{
   b.onclick=()=>{ document.querySelectorAll('#seg-terrain button').forEach(x=>x.setAttribute('aria-pressed','false')); b.setAttribute('aria-pressed','true'); routeProfile=b.dataset.profile; };
 });
+document.getElementById('btn-key-toggle').onclick = ()=>{
+  const inp=document.getElementById('ors-key'), btn=document.getElementById('btn-key-toggle');
+  const show = inp.type==='password';
+  inp.type = show ? 'text' : 'password';
+  btn.textContent = show ? 'Verberg' : 'Toon';
+  btn.setAttribute('aria-pressed', String(show));
+};
 
 // Start op instellingen als er nog niets is opgeslagen
 if(!store.get('vd_settings')) openTab('instellingen'); else openTab('schema');
