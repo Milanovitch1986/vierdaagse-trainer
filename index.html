@@ -1,0 +1,744 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Vierdaagse Trainer</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;700;800;900&family=Instrument+Sans:wght@400;500;600&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#E9EEE4;
+    --card:#FBFCF8;
+    --ink:#16211B;
+    --ink-soft:#4C594F;
+    --route:#1C5238;
+    --route-2:#2E7D53;
+    --gladiool:#CE2C63;
+    --marker:#E1A02C;
+    --line:#D2DBC9;
+    --line-soft:#E2E8DA;
+    --shadow:0 1px 0 rgba(22,33,27,.04), 0 8px 24px rgba(22,33,27,.06);
+    --r:14px;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    background:var(--paper);
+    color:var(--ink);
+    font-family:'Instrument Sans',system-ui,-apple-system,sans-serif;
+    font-size:16px;line-height:1.5;
+    -webkit-font-smoothing:antialiased;
+  }
+  .mono{font-family:'Space Mono',ui-monospace,monospace}
+  h1,h2,h3{font-family:'Archivo',sans-serif;margin:0;line-height:1.05;letter-spacing:-.01em}
+  a{color:var(--route)}
+  button{font-family:inherit}
+
+  /* Layout shell */
+  .wrap{max-width:760px;margin:0 auto;padding:0 16px 120px}
+
+  /* Header / hero */
+  header{
+    background:var(--route);
+    color:#EAF1E7;
+    border-bottom:3px solid var(--gladiool);
+  }
+  .hero{max-width:760px;margin:0 auto;padding:26px 16px 22px;position:relative}
+  .eyebrow{
+    font-family:'Space Mono',monospace;font-size:12px;letter-spacing:.22em;
+    text-transform:uppercase;color:#9FC6AD;margin:0 0 8px
+  }
+  .hero h1{font-size:clamp(30px,8vw,46px);font-weight:900;color:#fff;text-transform:uppercase;letter-spacing:-.02em}
+  .hero h1 .g{color:var(--gladiool)}
+  .hero p{margin:10px 0 0;color:#C8DBCC;max-width:46ch;font-size:15px}
+
+  .countdown{
+    margin-top:18px;display:flex;gap:10px;flex-wrap:wrap;align-items:stretch;
+  }
+  .cd-chip{
+    background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.16);
+    border-radius:10px;padding:10px 14px;min-width:74px;
+  }
+  .cd-chip .n{font-family:'Space Mono',monospace;font-size:22px;font-weight:700;color:#fff;display:block}
+  .cd-chip .l{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:#9FC6AD}
+
+  /* Tabs */
+  nav.tabs{
+    position:sticky;top:0;z-index:600;background:var(--paper);
+    border-bottom:1px solid var(--line);
+  }
+  .tabs-inner{max-width:760px;margin:0 auto;display:flex;gap:6px;padding:10px 12px;overflow-x:auto}
+  .tab{
+    border:1px solid var(--line);background:var(--card);color:var(--ink-soft);
+    padding:9px 15px;border-radius:999px;font-weight:600;font-size:14px;white-space:nowrap;
+    cursor:pointer;transition:all .15s ease;flex:0 0 auto;
+  }
+  .tab:hover{border-color:var(--route-2)}
+  .tab[aria-selected="true"]{background:var(--route);border-color:var(--route);color:#fff}
+  .tab:focus-visible{outline:3px solid var(--marker);outline-offset:2px}
+
+  section.panel{display:none;padding-top:22px}
+  section.panel.active{display:block}
+  .panel h2{font-size:24px;font-weight:800;margin-bottom:4px}
+  .panel .sub{color:var(--ink-soft);font-size:14px;margin:0 0 18px}
+
+  /* Cards & forms */
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:18px;box-shadow:var(--shadow)}
+  .card + .card{margin-top:14px}
+  label{display:block;font-weight:600;font-size:14px;margin:0 0 6px}
+  .hint{font-size:13px;color:var(--ink-soft);margin:4px 0 0;line-height:1.45}
+  input[type=text],input[type=date],input[type=number],select{
+    width:100%;padding:11px 12px;border:1px solid var(--line);border-radius:10px;
+    background:#fff;font-size:15px;color:var(--ink);font-family:inherit;
+  }
+  input:focus,select:focus{outline:3px solid var(--marker);outline-offset:1px;border-color:var(--route-2)}
+  .field{margin-bottom:16px}
+  .row{display:flex;gap:12px;flex-wrap:wrap}
+  .row > .field{flex:1 1 200px;margin-bottom:0}
+  .row-wrap{margin-bottom:16px}
+
+  .seg{display:flex;gap:0;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+  .seg button{
+    flex:1;padding:11px 8px;border:0;background:#fff;cursor:pointer;font-weight:600;
+    color:var(--ink-soft);font-size:14px;border-right:1px solid var(--line);
+  }
+  .seg button:last-child{border-right:0}
+  .seg button[aria-pressed="true"]{background:var(--route);color:#fff}
+  .seg button:focus-visible{outline:3px solid var(--marker);outline-offset:-3px}
+
+  .btn{
+    display:inline-flex;align-items:center;justify-content:center;gap:8px;
+    background:var(--route);color:#fff;border:0;border-radius:10px;
+    padding:13px 18px;font-weight:700;font-size:15px;cursor:pointer;transition:background .15s;
+  }
+  .btn:hover{background:#164429}
+  .btn:focus-visible{outline:3px solid var(--marker);outline-offset:2px}
+  .btn.secondary{background:#fff;color:var(--route);border:1px solid var(--line)}
+  .btn.secondary:hover{background:#F2F6EE}
+  .btn.magenta{background:var(--gladiool)}
+  .btn.magenta:hover{background:#a81f4f}
+  .btn.block{width:100%}
+  .btn[disabled]{opacity:.5;cursor:not-allowed}
+
+  details.key{margin-top:8px;border:1px dashed var(--line);border-radius:10px;padding:0}
+  details.key summary{cursor:pointer;padding:11px 13px;font-weight:600;font-size:14px;color:var(--route)}
+  details.key .body{padding:0 14px 14px;font-size:14px;color:var(--ink-soft)}
+  details.key ol{margin:6px 0 0;padding-left:20px}
+  details.key li{margin:5px 0}
+
+  .savebar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:6px}
+  .saved-msg{color:var(--route-2);font-weight:600;font-size:14px;opacity:0;transition:opacity .2s}
+  .saved-msg.show{opacity:1}
+
+  /* Schema route-line (signature) */
+  .phase-legend{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px}
+  .phase-legend span{font-size:12px;font-weight:600;padding:5px 10px;border-radius:999px;color:#fff}
+
+  .road{position:relative;padding-left:34px}
+  .road::before{
+    content:"";position:absolute;left:11px;top:6px;bottom:6px;width:3px;
+    background:linear-gradient(var(--line) 60%, transparent 0);
+    background-size:3px 12px;
+  }
+  .week{position:relative;margin-bottom:14px}
+  .node{
+    position:absolute;left:-34px;top:20px;width:24px;height:24px;border-radius:50%;
+    background:var(--card);border:3px solid var(--line);z-index:2;
+  }
+  .week.done .node{background:var(--route-2);border-color:var(--route-2)}
+  .week.now .node{border-color:var(--gladiool);background:var(--gladiool);box-shadow:0 0 0 5px rgba(206,44,99,.16)}
+  .wk-card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:14px 16px;box-shadow:var(--shadow)}
+  .week.now .wk-card{border-color:var(--gladiool)}
+  .wk-head{display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap}
+  .wk-title{font-family:'Archivo';font-weight:800;font-size:16px}
+  .wk-phase{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:3px 9px;border-radius:999px;color:#fff}
+  .wk-date{font-family:'Space Mono';font-size:12px;color:var(--ink-soft)}
+  .wk-now-flag{font-size:11px;font-weight:700;color:var(--gladiool);letter-spacing:.1em;text-transform:uppercase}
+  .days{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+  .day{
+    flex:0 0 auto;text-align:center;border:1px solid var(--line-soft);border-radius:10px;
+    padding:8px 10px;min-width:58px;background:#fff;
+  }
+  .day .d{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-soft)}
+  .day .km{font-family:'Space Mono';font-weight:700;font-size:15px;color:var(--ink);margin-top:3px}
+  .day.rest{background:var(--line-soft);opacity:.75}
+  .day.rest .km{color:var(--ink-soft);font-size:12px}
+  .day.long{border-color:var(--gladiool);background:#FCEFF3}
+  .day.long .km{color:var(--gladiool)}
+  .wk-focus{margin-top:12px;font-size:13px;color:var(--ink-soft);display:flex;gap:7px;align-items:flex-start}
+  .wk-focus b{color:var(--ink)}
+  .wk-total{font-family:'Space Mono';font-size:12px;color:var(--ink-soft);margin-top:8px}
+  .wk-check{display:flex;align-items:center;gap:7px;margin-top:10px;font-size:13px;font-weight:600;color:var(--ink-soft);cursor:pointer}
+  .wk-check input{width:17px;height:17px;accent-color:var(--route-2)}
+
+  /* Route panel */
+  #map{height:340px;border-radius:var(--r);border:1px solid var(--line);margin-top:4px;background:#dfe6d8}
+  .route-controls{margin-top:14px}
+  .route-stats{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
+  .stat{flex:1 1 120px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+  .stat .l{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-soft)}
+  .stat .v{font-family:'Space Mono';font-weight:700;font-size:22px;margin-top:2px}
+  .notice{background:#FDF6E6;border:1px solid #E6D28A;border-radius:10px;padding:11px 13px;font-size:13px;color:#6b551f;margin-top:12px}
+  .notice.err{background:#FCEEF0;border-color:#E4A9B6;color:#8a2540}
+
+  /* Tips */
+  .tip{display:flex;gap:12px;padding:14px 0;border-bottom:1px solid var(--line-soft)}
+  .tip:last-child{border-bottom:0}
+  .tip .num{font-family:'Space Mono';font-weight:700;color:var(--gladiool);font-size:14px;flex:0 0 auto;width:26px}
+  .tip .t b{display:block;margin-bottom:2px}
+  .tip .t{font-size:14px;color:var(--ink-soft)}
+  .tip .t b{color:var(--ink)}
+
+  .empty{text-align:center;color:var(--ink-soft);padding:40px 20px;font-size:15px}
+  .empty .btn{margin-top:14px}
+
+  footer{max-width:760px;margin:0 auto;padding:24px 16px;color:var(--ink-soft);font-size:12px;text-align:center;line-height:1.6}
+
+  @media (max-width:520px){
+    .day{min-width:52px;padding:7px 6px}
+    #map{height:280px}
+  }
+  @media (prefers-reduced-motion:reduce){
+    *{transition:none!important}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="hero">
+    <p class="eyebrow">Trainingsmaatje · Nijmegen</p>
+    <h1>Vierdaagse <span class="g">Trainer</span></h1>
+    <p>Jouw persoonlijke opbouwschema naar de Via Gladiola, met steeds nieuwe wandelrondjes bij jou in de buurt.</p>
+    <div class="countdown" id="countdown"></div>
+  </div>
+</header>
+
+<nav class="tabs" aria-label="Onderdelen">
+  <div class="tabs-inner" role="tablist">
+    <button class="tab" role="tab" data-tab="schema" aria-selected="true">Schema</button>
+    <button class="tab" role="tab" data-tab="route" aria-selected="false">Route</button>
+    <button class="tab" role="tab" data-tab="tips" aria-selected="false">Tips</button>
+    <button class="tab" role="tab" data-tab="instellingen" aria-selected="false">Instellingen</button>
+  </div>
+</nav>
+
+<div class="wrap">
+
+  <!-- SCHEMA -->
+  <section class="panel" id="panel-schema">
+    <h2>Trainingsschema</h2>
+    <p class="sub" id="schema-sub">Van vandaag tot je eerste wandeldag, week voor week.</p>
+    <div id="phase-legend" class="phase-legend"></div>
+    <div id="schema-out"></div>
+  </section>
+
+  <!-- ROUTE -->
+  <section class="panel" id="panel-route">
+    <h2>Wandelroute in de buurt</h2>
+    <p class="sub">Kies een afstand en genereer een rondje. Elke keer weer een ander parcours.</p>
+
+    <div class="card">
+      <div class="field">
+        <label for="loc-input">Startpunt (adres, plaats of postcode)</label>
+        <input type="text" id="loc-input" placeholder="bijv. Grote Markt, Tilburg" autocomplete="off">
+        <p class="hint">Vul een startpunt in en zoek, of gebruik je huidige locatie.</p>
+      </div>
+      <div class="row-wrap">
+        <div class="savebar">
+          <button class="btn secondary" id="btn-search">Zoek startpunt</button>
+          <button class="btn secondary" id="btn-geo">Mijn locatie</button>
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="dist-input">Afstand van het rondje: <span class="mono" id="dist-label">10 km</span></label>
+        <input type="range" id="dist-input" min="3" max="45" step="1" value="10" style="width:100%">
+        <p class="hint" id="dist-week-hint"></p>
+      </div>
+
+      <button class="btn magenta block" id="btn-route">Genereer rondje</button>
+    </div>
+
+    <div id="map"></div>
+    <div class="route-stats" id="route-stats" style="display:none">
+      <div class="stat"><div class="l">Afstand</div><div class="v mono" id="stat-dist">–</div></div>
+      <div class="stat"><div class="l">Wandeltijd (±5 km/u)</div><div class="v mono" id="stat-time">–</div></div>
+    </div>
+    <div id="route-note"></div>
+    <div class="route-controls" id="route-again" style="display:none">
+      <button class="btn secondary block" id="btn-again">Ander rondje, zelfde afstand</button>
+    </div>
+  </section>
+
+  <!-- TIPS -->
+  <section class="panel" id="panel-tips">
+    <h2>Zo haal je de finish</h2>
+    <p class="sub">De belangrijkste lessen voor een eerste Vierdaagse.</p>
+    <div class="card" id="tips-out"></div>
+  </section>
+
+  <!-- INSTELLINGEN -->
+  <section class="panel" id="panel-instellingen">
+    <h2>Instellingen</h2>
+    <p class="sub">Stel je doel in; het schema past zich er automatisch op aan.</p>
+
+    <div class="card">
+      <div class="field">
+        <label for="name">Je naam (optioneel)</label>
+        <input type="text" id="name" placeholder="Milanovitch">
+      </div>
+
+      <div class="field">
+        <label>Doelafstand per dag</label>
+        <div class="seg" id="seg-goal">
+          <button data-goal="30" aria-pressed="false">30 km</button>
+          <button data-goal="40" aria-pressed="true">40 km</button>
+          <button data-goal="50" aria-pressed="false">50 km</button>
+        </div>
+        <p class="hint">Voor mannen van 19 t/m 49 is 50 km de reglementaire afstand. 40 km is voor veel deelnemers de gangbare keuze.</p>
+      </div>
+
+      <div class="field">
+        <label>Je huidige wandelconditie</label>
+        <div class="seg" id="seg-level">
+          <button data-level="beginner" aria-pressed="true">Beginner</button>
+          <button data-level="gemiddeld" aria-pressed="false">Gemiddeld</button>
+          <button data-level="gevorderd" aria-pressed="false">Gevorderd</button>
+        </div>
+        <p class="hint">Beginner = je wandelt nu weinig · Gemiddeld = je loopt regelmatig 8–12 km · Gevorderd = 15 km is geen probleem.</p>
+      </div>
+
+      <div class="row">
+        <div class="field">
+          <label for="start-date">Startdatum training</label>
+          <input type="date" id="start-date">
+        </div>
+        <div class="field">
+          <label for="event-date">Eerste wandeldag Vierdaagse</label>
+          <input type="date" id="event-date">
+        </div>
+      </div>
+      <p class="hint" style="margin-bottom:16px">De Vierdaagse 2027 valt naar verwachting rond dinsdag 20 t/m vrijdag 23 juli. Pas de datum aan als de organisatie iets anders bekendmaakt.</p>
+
+      <div class="field" style="margin-bottom:6px">
+        <label for="ors-key">OpenRouteService API-sleutel (voor het genereren van routes)</label>
+        <input type="text" id="ors-key" placeholder="Plak hier je gratis sleutel" autocomplete="off">
+        <details class="key">
+          <summary>Hoe kom ik gratis aan zo'n sleutel?</summary>
+          <div class="body">
+            De kaart en het adres zoeken werken zonder sleutel. Om <b>automatisch rondjes te laten uittekenen</b> heb je een gratis sleutel nodig (goed voor 2000 routes per dag):
+            <ol>
+              <li>Ga naar <b>openrouteservice.org</b> en maak een gratis account.</li>
+              <li>Open in je account "Dashboard" → "Tokens" / "Request a token".</li>
+              <li>Kopieer de sleutel en plak hem hierboven.</li>
+            </ol>
+            De sleutel blijft alleen op dit apparaat staan.
+          </div>
+        </details>
+      </div>
+
+      <div class="savebar">
+        <button class="btn" id="btn-save">Opslaan &amp; schema bouwen</button>
+        <span class="saved-msg" id="saved-msg">Opgeslagen ✓</span>
+      </div>
+    </div>
+  </section>
+
+</div>
+
+<footer>
+  Algemeen opbouwschema als hulpmiddel, geen medisch advies. Luister naar je lichaam, bouw rustig op en raadpleeg bij twijfel of klachten een arts of fysiotherapeut.<br>
+  Kaartdata © OpenStreetMap-bijdragers · Routes via OpenRouteService.
+</footer>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+<script>
+/* ---------- Veilige opslag (werkt gehost, valt terug op geheugen in preview) ---------- */
+const store = (function(){
+  let ok = false; const mem = {};
+  try { localStorage.setItem('__t','1'); localStorage.removeItem('__t'); ok = true; } catch(e){}
+  return {
+    get:(k)=>{ try{ return ok?localStorage.getItem(k):mem[k]; }catch(e){ return mem[k]; } },
+    set:(k,v)=>{ try{ if(ok) localStorage.setItem(k,v); else mem[k]=v; }catch(e){ mem[k]=v; } }
+  };
+})();
+
+/* ---------- Standaardinstellingen ---------- */
+function todayISO(){ const d=new Date(); return d.toISOString().slice(0,10); }
+const DEFAULTS = { name:'', goal:40, level:'beginner', start:todayISO(), event:'2027-07-20', key:'' };
+
+let settings = loadSettings();
+function loadSettings(){
+  try { return Object.assign({}, DEFAULTS, JSON.parse(store.get('vd_settings')||'{}')); }
+  catch(e){ return Object.assign({}, DEFAULTS); }
+}
+function saveSettings(){ store.set('vd_settings', JSON.stringify(settings)); }
+
+let doneWeeks = {};
+try { doneWeeks = JSON.parse(store.get('vd_done')||'{}'); } catch(e){ doneWeeks = {}; }
+function saveDone(){ store.set('vd_done', JSON.stringify(doneWeeks)); }
+
+/* ---------- Hulpfuncties datum ---------- */
+function mondayOf(d){ const x=new Date(d); const day=(x.getDay()+6)%7; x.setDate(x.getDate()-day); x.setHours(0,0,0,0); return x; }
+function fmtDate(d){ return d.toLocaleDateString('nl-NL',{day:'numeric',month:'short'}); }
+function addDays(d,n){ const x=new Date(d); x.setDate(x.getDate()+n); return x; }
+
+/* ---------- Schema-generator ---------- */
+const PHASES = {
+  basis:   {label:'Basis',   color:'#2E7D53'},
+  opbouw:  {label:'Opbouw',  color:'#1C5238'},
+  piek:    {label:'Piek',    color:'#CE2C63'},
+  taper:   {label:'Taperen', color:'#E1A02C'}
+};
+const DAY_NAMES = ['Ma','Di','Wo','Do','Vr','Za','Zo'];
+
+function generateSchema(){
+  const start = mondayOf(new Date(settings.start));
+  const event = new Date(settings.event);
+  const totalWeeks = Math.floor((event - start)/(7*864e5));
+  if (totalWeeks < 2) return {weeks:[], totalWeeks};
+
+  const startLong = settings.level==='gevorderd'?15 : settings.level==='gemiddeld'?10 : 6;
+  const goal = settings.goal;
+  // Piek-langste wandeling: dichtbij doel, maar niet de volle afstand nodig in training
+  const peakLong = goal>=50 ? 42 : goal>=40 ? 34 : 27;
+
+  // Faseverdeling
+  const taperWeeks = totalWeeks>=16 ? 2 : 1;
+  const buildWeeks = totalWeeks - taperWeeks;
+  const piekWeeks  = Math.max(1, Math.round(buildWeeks*0.18));
+  const basisEnd   = Math.round(buildWeeks*0.40);
+  const b2bStart   = Math.round(buildWeeks*0.45); // vanaf hier rug-aan-rug weekend
+
+  const weeks = [];
+  for (let i=0;i<totalWeeks;i++){
+    const wkStart = addDays(start, i*7);
+    let phase, longKm, secondLong=0, midCount, note;
+
+    const inTaper = i >= buildWeeks;
+    const inPiek  = !inTaper && i >= (buildWeeks - piekWeeks);
+
+    if (inTaper){
+      phase='taper';
+      const t = i - buildWeeks; // 0..taperWeeks-1
+      longKm = Math.round(peakLong * (t===0?0.55:0.35));
+      midCount = 2;
+      note = t===taperWeeks-1
+        ? 'Laatste week: kort en fris blijven. Nieuwe schoenen? Nu niet meer. Rust goed uit.'
+        : 'Volume omlaag, benen fris houden. Wandel ontspannen, geen lange afstanden meer.';
+    } else {
+      // opbouwfactor 0..1 over de buildWeeks
+      const p = buildWeeks>1 ? i/(buildWeeks-1) : 1;
+      let base = startLong + (peakLong - startLong)*Math.pow(p, 0.95);
+      // herstelweek elke 4e week: iets terug
+      if ((i+1)%4===0 && !inPiek) base *= 0.75;
+      longKm = Math.round(base);
+
+      if (i < basisEnd){ phase='basis'; midCount = settings.level==='beginner'?2:3; note='Rustig wennen aan wandelen. Praattempo, focus op regelmaat en goede schoenen.'; }
+      else if (inPiek){ phase='piek'; midCount=3; note='Zwaarste blok. Het rug-aan-rug weekend is nu het belangrijkst — dat traint de vermoeide benen van dag 2.'; }
+      else { phase='opbouw'; midCount=3; note='Afstand groeit. Bouw het weekend uit met twee dagen op rij.'; }
+
+      // rug-aan-rug tweede lange dag (zondag)
+      if (i >= b2bStart){
+        secondLong = Math.round(longKm * (inPiek?0.85:0.65));
+      }
+    }
+
+    // Dagen invullen: Ma/Wo/(Vr) midweek, Za lang, Zo tweede lange dag of rust
+    const midKm = Math.max(3, Math.round(longKm*0.45));
+    const days = [
+      {d:'Ma', km: midCount>=1?midKm:0, type: midCount>=1?'mid':'rest'},
+      {d:'Di', km:0, type:'rest'},
+      {d:'Wo', km: midCount>=2?midKm:0, type: midCount>=2?'mid':'rest'},
+      {d:'Do', km:0, type:'rest'},
+      {d:'Vr', km: midCount>=3?Math.round(midKm*0.9):0, type: midCount>=3?'mid':'rest'},
+      {d:'Za', km:longKm, type:'long'},
+      {d:'Zo', km:secondLong, type: secondLong>0?'long':'rest'}
+    ];
+    const total = days.reduce((s,x)=>s+x.km,0);
+    weeks.push({index:i, wkStart, phase, days, note, total});
+  }
+  return {weeks, totalWeeks};
+}
+
+/* ---------- Schema renderen ---------- */
+let schemaCache = null;
+function renderSchema(){
+  const out = document.getElementById('schema-out');
+  const sub = document.getElementById('schema-sub');
+  const legend = document.getElementById('phase-legend');
+  const res = generateSchema();
+  schemaCache = res;
+
+  if (!res.weeks.length){
+    legend.innerHTML='';
+    out.innerHTML = '<div class="empty">De periode tot je eerste wandeldag is te kort (of de datums kloppen niet).<br>Controleer de datums bij Instellingen.<button class="btn" onclick="openTab(\'instellingen\')">Naar instellingen</button></div>';
+    return;
+  }
+
+  legend.innerHTML = Object.values(PHASES).map(p=>
+    `<span style="background:${p.color}">${p.label}</span>`).join('');
+
+  const now = new Date(); now.setHours(0,0,0,0);
+  const naam = settings.name ? settings.name+', ' : '';
+  sub.textContent = `${naam}${res.totalWeeks} weken opbouw naar ${settings.goal} km per dag. Vink af wat je gelopen hebt.`;
+
+  let html = '<div class="road">';
+  res.weeks.forEach(w=>{
+    const wkEnd = addDays(w.wkStart,6);
+    const isNow = now >= w.wkStart && now <= wkEnd;
+    const isDone = !!doneWeeks[w.index] || (wkEnd < now && !isNow);
+    const ph = PHASES[w.phase];
+    const cls = ['week']; if(isNow)cls.push('now'); if(doneWeeks[w.index])cls.push('done');
+
+    const daysHtml = w.days.map(d=>{
+      if (d.type==='rest') return `<div class="day rest"><div class="d">${d.d}</div><div class="km">rust</div></div>`;
+      const c = d.type==='long'?'day long':'day';
+      return `<div class="${c}"><div class="d">${d.d}</div><div class="km">${d.km}</div></div>`;
+    }).join('');
+
+    html += `
+    <div class="${cls.join(' ')}">
+      <div class="node"></div>
+      <div class="wk-card">
+        <div class="wk-head">
+          <div>
+            <div class="wk-title">Week ${w.index+1}${isNow?' <span class="wk-now-flag">· nu</span>':''}</div>
+            <div class="wk-date">${fmtDate(w.wkStart)} – ${fmtDate(wkEnd)}</div>
+          </div>
+          <span class="wk-phase" style="background:${ph.color}">${ph.label}</span>
+        </div>
+        <div class="days">${daysHtml}</div>
+        <div class="wk-total">Totaal deze week: ${w.total} km</div>
+        <div class="wk-focus"><span>➜</span><div>${w.note}</div></div>
+        <label class="wk-check"><input type="checkbox" data-wk="${w.index}" ${doneWeeks[w.index]?'checked':''}> Deze week afgerond</label>
+      </div>
+    </div>`;
+  });
+  html += '</div>';
+  out.innerHTML = html;
+
+  out.querySelectorAll('input[type=checkbox]').forEach(cb=>{
+    cb.addEventListener('change',()=>{
+      const i = cb.dataset.wk;
+      if (cb.checked) doneWeeks[i]=true; else delete doneWeeks[i];
+      saveDone(); renderSchema();
+    });
+  });
+
+  // scroll huidige week in beeld
+  const nowEl = out.querySelector('.week.now');
+  if (nowEl) setTimeout(()=>nowEl.scrollIntoView({behavior:'smooth',block:'center'}),150);
+}
+
+/* ---------- Countdown ---------- */
+function renderCountdown(){
+  const el = document.getElementById('countdown');
+  const event = new Date(settings.event);
+  const now = new Date(); now.setHours(0,0,0,0);
+  const days = Math.max(0, Math.ceil((event-now)/864e5));
+  const weeks = Math.floor(days/7);
+  const res = schemaCache || generateSchema();
+  const curWeek = res.weeks.findIndex(w=> now>=w.wkStart && now<=addDays(w.wkStart,6));
+  el.innerHTML = `
+    <div class="cd-chip"><span class="n">${days}</span><span class="l">dagen te gaan</span></div>
+    <div class="cd-chip"><span class="n">${weeks}</span><span class="l">weken</span></div>
+    <div class="cd-chip"><span class="n">${settings.goal}</span><span class="l">km / dag doel</span></div>
+    ${curWeek>=0?`<div class="cd-chip"><span class="n">${curWeek+1}</span><span class="l">huidige week</span></div>`:''}
+  `;
+}
+
+/* ---------- Instellingen UI ---------- */
+function initSettingsUI(){
+  document.getElementById('name').value = settings.name;
+  document.getElementById('start-date').value = settings.start;
+  document.getElementById('event-date').value = settings.event;
+  document.getElementById('ors-key').value = settings.key;
+
+  document.querySelectorAll('#seg-goal button').forEach(b=>{
+    b.setAttribute('aria-pressed', String(+b.dataset.goal===settings.goal));
+    b.onclick=()=>{ document.querySelectorAll('#seg-goal button').forEach(x=>x.setAttribute('aria-pressed','false')); b.setAttribute('aria-pressed','true'); settings.goal=+b.dataset.goal; };
+  });
+  document.querySelectorAll('#seg-level button').forEach(b=>{
+    b.setAttribute('aria-pressed', String(b.dataset.level===settings.level));
+    b.onclick=()=>{ document.querySelectorAll('#seg-level button').forEach(x=>x.setAttribute('aria-pressed','false')); b.setAttribute('aria-pressed','true'); settings.level=b.dataset.level; };
+  });
+
+  document.getElementById('btn-save').onclick = ()=>{
+    settings.name = document.getElementById('name').value.trim();
+    settings.start = document.getElementById('start-date').value || todayISO();
+    settings.event = document.getElementById('event-date').value || DEFAULTS.event;
+    settings.key = document.getElementById('ors-key').value.trim();
+    saveSettings();
+    renderSchema(); renderCountdown(); updateWeekHint();
+    const m=document.getElementById('saved-msg'); m.classList.add('show'); setTimeout(()=>m.classList.remove('show'),1800);
+    openTab('schema');
+  };
+}
+
+/* ---------- Tabs ---------- */
+function openTab(name){
+  document.querySelectorAll('.tab').forEach(t=>t.setAttribute('aria-selected', String(t.dataset.tab===name)));
+  document.querySelectorAll('.panel').forEach(p=>p.classList.toggle('active', p.id==='panel-'+name));
+  if (name==='route' && map) setTimeout(()=>map.invalidateSize(),120);
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+document.querySelectorAll('.tab').forEach(t=> t.onclick=()=>openTab(t.dataset.tab));
+
+/* ---------- Kaart & routes ---------- */
+let map, startMarker, routeLayer, startCoord=null;
+
+const HOME = [51.5606, 5.0919]; // Tilburg centrum als standaard-startpunt
+function initMap(){
+  map = L.map('map',{scrollWheelZoom:false}).setView(HOME,13);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
+    maxZoom:19, attribution:'© OpenStreetMap'
+  }).addTo(map);
+  map.on('click', e=> setStart(e.latlng.lat, e.latlng.lng, true));
+  setStart(HOME[0], HOME[1]); // startpunt vast op Tilburg; verplaatsbaar via zoeken, locatie of tikken
+  document.getElementById('loc-input').value = 'Tilburg';
+}
+
+function setStart(lat,lng,fromClick){
+  startCoord=[lat,lng];
+  if (startMarker) map.removeLayer(startMarker);
+  startMarker = L.marker([lat,lng]).addTo(map).bindPopup('Startpunt');
+  if(!fromClick){ map.setView([lat,lng],14); }
+}
+
+async function searchLocation(){
+  const q = document.getElementById('loc-input').value.trim();
+  if(!q) return;
+  setRouteNote('Zoeken…','');
+  try{
+    const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=nl&q=${encodeURIComponent(q)}`;
+    const r = await fetch(url,{headers:{'Accept':'application/json'}});
+    const data = await r.json();
+    if(!data.length){ setRouteNote('Geen plek gevonden. Probeer een straat + plaats of een postcode.','err'); return; }
+    setStart(+data[0].lat, +data[0].lon);
+    setRouteNote('Startpunt gezet. Kies een afstand en genereer een rondje.','');
+  }catch(e){ setRouteNote('Zoeken lukte niet. Werkt het best wanneer je de app zelf host (bijv. GitHub Pages).','err'); }
+}
+
+function useGeo(){
+  if(!navigator.geolocation){ setRouteNote('Deze browser deelt geen locatie. Zoek je startpunt met een adres.','err'); return; }
+  setRouteNote('Locatie ophalen…','');
+  navigator.geolocation.getCurrentPosition(
+    p=>{ setStart(p.coords.latitude,p.coords.longitude); setRouteNote('Je locatie is gezet.',''); },
+    ()=> setRouteNote('Locatie delen lukte niet (in de preview vaak geblokkeerd). Zoek je startpunt met een adres — of host de app zelf.','err')
+  );
+}
+
+let lastDist=null;
+async function generateRoute(reuseDist){
+  if(!startCoord){ setRouteNote('Zet eerst een startpunt: zoek een adres, gebruik je locatie of tik op de kaart.','err'); return; }
+  const key = settings.key || document.getElementById('ors-key').value.trim();
+  if(!key){ setRouteNote('Voor het uittekenen van rondjes is een gratis OpenRouteService-sleutel nodig. Vul die in bij Instellingen (met uitleg hoe je hem krijgt).','err'); openTab('instellingen'); return; }
+
+  const distKm = reuseDist && lastDist ? lastDist : +document.getElementById('dist-input').value;
+  lastDist = distKm;
+  const length = distKm*1000;
+  const seed = Math.floor(Math.random()*100000);
+
+  setRouteNote('Rondje uittekenen…','');
+  document.getElementById('btn-route').disabled=true; document.getElementById('btn-again').disabled=true;
+  try{
+    const r = await fetch('https://api.openrouteservice.org/v2/directions/foot-walking/geojson',{
+      method:'POST',
+      headers:{'Authorization':key,'Content-Type':'application/json'},
+      body: JSON.stringify({
+        coordinates:[[startCoord[1],startCoord[0]]],
+        options:{ round_trip:{ length:length, points:5, seed:seed } }
+      })
+    });
+    if(!r.ok){
+      const t = r.status===403||r.status===401 ? 'De sleutel wordt niet geaccepteerd. Controleer je OpenRouteService-sleutel bij Instellingen.' :
+                r.status===429 ? 'Even te veel aanvragen. Wacht een halve minuut en probeer opnieuw.' :
+                'De routeservice gaf een fout ('+r.status+'). Probeer een iets kortere afstand.';
+      setRouteNote(t,'err'); return;
+    }
+    const geo = await r.json();
+    const feat = geo.features && geo.features[0];
+    if(!feat){ setRouteNote('Geen rondje gevonden vanaf dit punt. Probeer een ander startpunt of andere afstand.','err'); return; }
+
+    if(routeLayer) map.removeLayer(routeLayer);
+    routeLayer = L.geoJSON(feat,{style:{color:'#CE2C63',weight:5,opacity:.85}}).addTo(map);
+    map.fitBounds(routeLayer.getBounds(),{padding:[30,30]});
+
+    const sum = feat.properties.summary;
+    const km = (sum.distance/1000);
+    const min = Math.round(km/5*60); // ~5 km/u
+    document.getElementById('stat-dist').textContent = km.toFixed(1)+' km';
+    document.getElementById('stat-time').textContent = Math.floor(min/60)+'u '+(min%60)+'m';
+    document.getElementById('route-stats').style.display='flex';
+    document.getElementById('route-again').style.display='block';
+    setRouteNote('Klaar! Tik op "Ander rondje" voor een nieuw parcours met dezelfde afstand.','');
+  }catch(e){
+    setRouteNote('Route ophalen lukte niet. Dit werkt het best wanneer je de app zelf host op GitHub Pages (in de preview blokkeert de browser dit soms).','err');
+  }finally{
+    document.getElementById('btn-route').disabled=false; document.getElementById('btn-again').disabled=false;
+  }
+}
+
+function setRouteNote(msg,type){
+  const el=document.getElementById('route-note');
+  el.innerHTML = msg ? `<div class="notice ${type==='err'?'err':''}">${msg}</div>` : '';
+}
+
+/* Afstandsslider + hint uit huidige week */
+function updateWeekHint(){
+  const res = schemaCache || generateSchema();
+  const now=new Date(); now.setHours(0,0,0,0);
+  const cur = res.weeks.find(w=> now>=w.wkStart && now<=addDays(w.wkStart,6));
+  const hint=document.getElementById('dist-week-hint');
+  if(cur){
+    const longKm = Math.max(...cur.days.map(d=>d.km));
+    hint.innerHTML = `Tip: je langste wandeling deze week is <b>${longKm} km</b>. <a href="#" id="use-week-km">Gebruik deze afstand</a>.`;
+    const a=document.getElementById('use-week-km');
+    if(a) a.onclick=(e)=>{ e.preventDefault(); const s=document.getElementById('dist-input'); s.value=Math.min(45,longKm); s.dispatchEvent(new Event('input')); };
+  } else { hint.textContent=''; }
+}
+
+/* ---------- Tips ---------- */
+const TIPS = [
+  ['Train op twee dagen achter elkaar','De Vierdaagse is vier dagen op rij. Eén superlange wandeling traint dat niet. Loop juist in het weekend zaterdag én zondag — vermoeide benen op dag 2 zijn de echte oefening.'],
+  ['Bouw rustig op','Verhoog je langste afstand met ongeveer 10% per week en las elke vierde week een iets lichtere week in. Zo voorkom je blessures.'],
+  ['Loop je wedstrijdschoenen in','Gebruik de schoenen én sokken die je op de Vierdaagse draagt al weken vooraf. Nooit met nieuwe schoenen aan de start.'],
+  ['Verzorg je voeten','Knip nagels kort, gebruik goede sokken en behandel drukplekken meteen. Tape of blarenpleisters preventief op gevoelige plekken.'],
+  ['Oefen eten en drinken onderweg','Test tijdens lange trainingen wat je maag verdraagt: water, wat zout, en kleine porties. Kleine slokjes, regelmatig.'],
+  ['Wandel op tempo, niet op snelheid','Een rustig, vol te houden praattempo (±5 km/u) brengt je verder dan hard starten en halverwege leeglopen.'],
+  ['Taper de laatste weken','De laatste 1–2 weken minder kilometers. Je conditie is dan al opgebouwd; nu tel je vooral fris te blijven.'],
+  ['Kleding tegen alle weer','Oefen ook in regen en warmte. Laagjes, een pet en zonnebrand horen in je vaste uitrusting.']
+];
+function renderTips(){
+  document.getElementById('tips-out').innerHTML = TIPS.map((t,i)=>
+    `<div class="tip"><div class="num">${String(i+1).padStart(2,'0')}</div><div class="t"><b>${t[0]}</b>${t[1]}</div></div>`
+  ).join('');
+}
+
+/* ---------- Init ---------- */
+initSettingsUI();
+renderTips();
+renderSchema();
+renderCountdown();
+initMap();
+updateWeekHint();
+
+document.getElementById('dist-input').addEventListener('input',e=>{
+  document.getElementById('dist-label').textContent = e.target.value+' km';
+});
+document.getElementById('btn-search').onclick = searchLocation;
+document.getElementById('loc-input').addEventListener('keydown',e=>{ if(e.key==='Enter'){e.preventDefault();searchLocation();} });
+document.getElementById('btn-geo').onclick = useGeo;
+document.getElementById('btn-route').onclick = ()=>generateRoute(false);
+document.getElementById('btn-again').onclick = ()=>generateRoute(true);
+
+// Start op instellingen als er nog niets is opgeslagen
+if(!store.get('vd_settings')) openTab('instellingen'); else openTab('schema');
+</script>
+</body>
+</html>
