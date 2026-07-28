@@ -285,6 +285,15 @@
         <p class="hint" id="dist-week-hint"></p>
       </div>
 
+      <div class="field">
+        <label>Terreintype</label>
+        <div class="seg" id="seg-terrain">
+          <button data-profile="foot-walking" aria-pressed="true">Wegen &amp; paden</button>
+          <button data-profile="foot-hiking" aria-pressed="false">Natuur &amp; wandelpaden</button>
+        </div>
+        <label class="wk-check" style="margin-top:10px"><input type="checkbox" id="avoid-steps"> Trappen vermijden</label>
+      </div>
+
       <button class="btn magenta block" id="btn-route">Genereer rondje</button>
     </div>
 
@@ -729,6 +738,7 @@ document.querySelectorAll('.tab').forEach(t=> t.onclick=()=>openTab(t.dataset.ta
 
 /* ---------- Kaart & routes ---------- */
 let map, startMarker, routeLayer, startCoord=null;
+let routeProfile='foot-walking';
 
 const HOME = [51.5606, 5.0919]; // Tilburg centrum als standaard-startpunt
 function initMap(){
@@ -753,7 +763,7 @@ async function searchLocation(){
   if(!q) return;
   setRouteNote('Zoeken…','');
   try{
-    const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=nl&q=${encodeURIComponent(q)}`;
+    const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(q)}`;
     const r = await fetch(url,{headers:{'Accept':'application/json'}});
     const data = await r.json();
     if(!data.length){ setRouteNote('Geen plek gevonden. Probeer een straat + plaats of een postcode.','err'); return; }
@@ -784,8 +794,11 @@ async function generateRoute(reuseDist){
 
   setRouteNote('Rondje uittekenen…','');
   document.getElementById('btn-route').disabled=true; document.getElementById('btn-again').disabled=true;
+  const profile = routeProfile || 'foot-walking';
+  const routeOptions = { round_trip:{ length:length, points:5, seed:seed } };
+  if(document.getElementById('avoid-steps').checked) routeOptions.avoid_features=['steps'];
   try{
-    const r = await fetch('https://api.openrouteservice.org/v2/directions/foot-walking/geojson',{
+    const r = await fetch('https://api.openrouteservice.org/v2/directions/'+profile+'/geojson',{
       method:'POST',
       headers:{'Authorization':key,'Content-Type':'application/json'},
       body: JSON.stringify({
@@ -793,7 +806,7 @@ async function generateRoute(reuseDist){
         instructions:true,
         instructions_format:'text',
         language:'nl',
-        options:{ round_trip:{ length:length, points:5, seed:seed } }
+        options: routeOptions
       })
     });
     if(!r.ok){
@@ -939,6 +952,9 @@ document.getElementById('loc-input').addEventListener('keydown',e=>{ if(e.key===
 document.getElementById('btn-geo').onclick = useGeo;
 document.getElementById('btn-route').onclick = ()=>generateRoute(false);
 document.getElementById('btn-again').onclick = ()=>generateRoute(true);
+document.querySelectorAll('#seg-terrain button').forEach(b=>{
+  b.onclick=()=>{ document.querySelectorAll('#seg-terrain button').forEach(x=>x.setAttribute('aria-pressed','false')); b.setAttribute('aria-pressed','true'); routeProfile=b.dataset.profile; };
+});
 
 // Start op instellingen als er nog niets is opgeslagen
 if(!store.get('vd_settings')) openTab('instellingen'); else openTab('schema');
