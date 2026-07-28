@@ -418,6 +418,7 @@
 </footer>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+<script src="config.js"></script>
 <script>
 /* ---------- Veilige opslag (werkt gehost, valt terug op geheugen in preview) ---------- */
 const store = (function(){
@@ -432,15 +433,19 @@ const store = (function(){
 /* ---------- Standaardinstellingen ---------- */
 function todayISO(){ const d=new Date(); return d.toISOString().slice(0,10); }
 /* =====================================================================
-   OPTIONEEL: plak hieronder tussen de aanhalingstekens je OpenRouteService-
-   sleutel. Dan werkt het genereren van routes in ELKE browser en op elk
-   apparaat, zonder de sleutel telkens opnieuw in te vullen.
-   Let op: je GitHub Pages-site is openbaar, dus de sleutel is dan zichtbaar
-   in de broncode. Voor een gratis sleutel met daglimiet is dat een beperkt
-   risico; bij misbruik maak je gewoon een nieuwe sleutel aan.
-   Laat je hem leeg (""), dan werkt alles zoals nu (sleutel per browser opslaan).
+   API-SLEUTEL: de nette manier is om je sleutel in het aparte bestand
+   config.js te zetten (config.js openen en daar je sleutel invullen).
+   Dat bestand upload je één keer; nieuwe versies van index.html laten het
+   met rust, dus je hoeft je sleutel nooit opnieuw in te vullen.
+   Als terugval kun je hem hieronder ook rechtstreeks invullen.
+   Let op: je GitHub Pages-site is openbaar, dus de sleutel is zichtbaar in
+   de broncode. Voor een gratis sleutel met daglimiet is dat een beperkt
+   risico; bij misbruik maak je simpelweg een nieuwe sleutel aan.
    ===================================================================== */
-const DEFAULT_ORS_KEY = "eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6IjkyZGY0YmI3MzAwNTQwZjQ4ZmMwZWFkYzkzMzMyYjYxIiwiaCI6Im11cm11cjY0In0=";
+const DEFAULT_ORS_KEY = "";
+function configKey(){
+  return (typeof window.ORS_KEY === 'string' && window.ORS_KEY.indexOf('PLAK') === -1) ? window.ORS_KEY.trim() : '';
+}
 
 const DEFAULTS = { name:'', mode:'event', goal:40, targetKm:15, level:'beginner', start:todayISO(), event:'2027-07-20', key:'' };
 
@@ -712,7 +717,7 @@ function initSettingsUI(){
   document.getElementById('name').value = settings.name;
   document.getElementById('start-date').value = settings.start;
   document.getElementById('event-date').value = settings.event;
-  document.getElementById('ors-key').value = settings.key || DEFAULT_ORS_KEY;
+  document.getElementById('ors-key').value = settings.key || configKey() || DEFAULT_ORS_KEY;
 
   document.querySelectorAll('#seg-goal button').forEach(b=>{
     b.setAttribute('aria-pressed', String(+b.dataset.goal===settings.goal));
@@ -801,7 +806,7 @@ function useGeo(){
 let lastDist=null;
 async function generateRoute(reuseDist){
   if(!startCoord){ setRouteNote('Zet eerst een startpunt: zoek een adres, gebruik je locatie of tik op de kaart.','err'); return; }
-  const key = settings.key || document.getElementById('ors-key').value.trim() || DEFAULT_ORS_KEY;
+  const key = settings.key || document.getElementById('ors-key').value.trim() || configKey() || DEFAULT_ORS_KEY;
   if(!key){ setRouteNote('Voor het uittekenen van rondjes is een gratis OpenRouteService-sleutel nodig. Vul die in bij Instellingen (met uitleg hoe je hem krijgt).','err'); openTab('instellingen'); return; }
 
   const distKm = reuseDist && lastDist ? lastDist : +document.getElementById('dist-input').value;
