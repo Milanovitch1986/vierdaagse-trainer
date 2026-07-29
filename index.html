@@ -804,6 +804,30 @@ function useGeo(){
 }
 
 let lastDist=null;
+
+async function fetchRouteOnce(key, profile, length, seed, avoidSteps){
+  const options = { round_trip:{ length:length, points:5, seed:seed } };
+  if(avoidSteps) options.avoid_features=['steps'];
+  const r = await fetch('https://api.openrouteservice.org/v2/directions/'+profile+'/geojson',{
+    method:'POST',
+    headers:{'Authorization':key,'Content-Type':'application/json'},
+    body: JSON.stringify({
+      coordinates:[[startCoord[1],startCoord[0]]],
+      instructions:true, instructions_format:'text', language:'nl',
+      options: options
+    })
+  });
+  if(!r.ok){
+    let detail='';
+    try{ const eb=await r.json(); if(eb&&eb.error) detail = typeof eb.error==='string'?eb.error:(eb.error.message||''); }catch(e){}
+    const err=new Error('http'); err.status=r.status; err.detail=detail; throw err;
+  }
+  const geo = await r.json();
+  const feat = geo.features && geo.features[0];
+  if(!feat){ const err=new Error('nofeat'); err.status=0; throw err; }
+  return feat;
+}
+
 async function generateRoute(reuseDist){
   if(!startCoord){ setRouteNote('Zet eerst een startpunt: zoek een adres, gebruik je locatie of tik op de kaart.','err'); return; }
   const key = settings.key || document.getElementById('ors-key').value.trim() || configKey() || DEFAULT_ORS_KEY;
@@ -812,50 +836,54 @@ async function generateRoute(reuseDist){
   const distKm = reuseDist && lastDist ? lastDist : +document.getElementById('dist-input').value;
   lastDist = distKm;
   const length = distKm*1000;
-  const seed = Math.floor(Math.random()*100000);
-
-  setRouteNote('Rondje uittekenen…','');
-  document.getElementById('btn-route').disabled=true; document.getElementById('btn-again').disabled=true;
   const profile = routeProfile || 'foot-walking';
-  const routeOptions = { round_trip:{ length:length, points:5, seed:seed } };
-  if(document.getElementById('avoid-steps').checked) routeOptions.avoid_features=['steps'];
+  const avoidSteps = document.getElementById('avoid-steps').checked;
+
+  document.getElementById('btn-route').disabled=true; document.getElementById('btn-again').disabled=true;
+
+  const MAX_TRIES = 5;    // meerdere rondjes proberen
+  const TOL = 0.18;       // binnen 18% van de gevraagde afstand = goed genoeg
+  let best=null, lastErr=null;
+
   try{
-    const r = await fetch('https://api.openrouteservice.org/v2/directions/'+profile+'/geojson',{
-      method:'POST',
-      headers:{'Authorization':key,'Content-Type':'application/json'},
-      body: JSON.stringify({
-        coordinates:[[startCoord[1],startCoord[0]]],
-        instructions:true,
-        instructions_format:'text',
-        language:'nl',
-        options: routeOptions
-      })
-    });
-    if(!r.ok){
-      let detail='';
-      try{ const eb=await r.json(); if(eb&&eb.error) detail = typeof eb.error==='string'?eb.error:(eb.error.message||''); }catch(e){}
-      const t = r.status===403||r.status===401 ? 'De sleutel wordt niet geaccepteerd. Controleer je OpenRouteService-sleutel bij Instellingen.' :
-                r.status===429 ? 'Even te veel aanvragen. Wacht een halve minuut en probeer opnieuw.' :
-                'De routeservice gaf een fout ('+r.status+')'+(detail?': '+detail:'.')+' Probeer eventueel een andere afstand of startpunt.';
+    for(let i=0;i<MAX_TRIES;i++){
+      setRouteNote('Passende route zoeken… (poging '+(i+1)+')','');
+      const seed = Math.floor(Math.random()*100000);
+      let feat;
+      try{ feat = await fetchRouteOnce(key, profile, length, seed, avoidSteps); }
+      catch(err){ lastErr=err; if(err.status===401||err.status===403||err.status===429) break; continue; }
+      const km = feat.properties.summary.distance/1000;
+      const diff = Math.abs(km - distKm)/distKm;
+      if(!best || diff < best.diff) best = {feat, km, diff};
+      if(diff <= TOL) break; // dichtbij genoeg, niet verder zoeken
+    }
+
+    if(!best){
+      let t;
+      if(lastErr && (lastErr.status===401||lastErr.status===403)) t='De sleutel wordt niet geaccepteerd. Controleer je OpenRouteService-sleutel bij Instellingen.';
+      else if(lastErr && lastErr.status===429) t='Even te veel aanvragen. Wacht een halve minuut en probeer opnieuw.';
+      else if(lastErr && lastErr.status>0) t='De routeservice gaf een fout ('+lastErr.status+')'+(lastErr.detail?': '+lastErr.detail:'.')+' Probeer een andere afstand of startpunt.';
+      else t='Geen rondje gevonden vanaf dit punt. Probeer een ander startpunt of andere afstand.';
       setRouteNote(t,'err'); return;
     }
-    const geo = await r.json();
-    const feat = geo.features && geo.features[0];
-    if(!feat){ setRouteNote('Geen rondje gevonden vanaf dit punt. Probeer een ander startpunt of andere afstand.','err'); return; }
 
+    const feat = best.feat, km = best.km;
     if(routeLayer) map.removeLayer(routeLayer);
     routeLayer = L.geoJSON(feat,{style:{color:'#CE2C63',weight:5,opacity:.85}}).addTo(map);
     map.fitBounds(routeLayer.getBounds(),{padding:[30,30]});
 
-    const sum = feat.properties.summary;
-    const km = (sum.distance/1000);
     const min = Math.round(km/5*60); // ~5 km/u
     document.getElementById('stat-dist').textContent = km.toFixed(1)+' km';
     document.getElementById('stat-time').textContent = Math.floor(min/60)+'u '+(min%60)+'m';
     document.getElementById('route-stats').style.display='flex';
     document.getElementById('route-again').style.display='block';
     renderDirections(feat, km, min);
-    setRouteNote('Klaar! Tik op "Ander rondje" voor een nieuw parcours, of bewaar de beschrijving voor onderweg.','');
+
+    if(best.diff > 0.35){
+      setRouteNote('Let op: dit rondje is '+km.toFixed(1)+' km terwijl je '+distKm+' km vroeg. In dit gebied zijn weinig wandelpaden, waardoor een exactere lus lastig is. Probeer een ander startpunt, een andere afstand, of tik op "Ander rondje".','err');
+    } else {
+      setRouteNote('Klaar! Tik op "Ander rondje" voor een nieuw parcours, of bewaar de beschrijving voor onderweg.','');
+    }
   }catch(e){
     setRouteNote('Route ophalen lukte niet. Dit werkt het best wanneer je de app zelf host op GitHub Pages (in de preview blokkeert de browser dit soms).','err');
   }finally{
